@@ -1,6 +1,7 @@
 // Écran d'accueil qui contrôle l'entrée dans la partie.
 import { BookOpen, Compass, Save, X } from 'lucide-react'
 import { useState } from 'react'
+import packageInfo from '../../../package.json'
 
 type MainMenuProps = {
 	hasSave: boolean
@@ -23,7 +24,7 @@ export function MainMenu({ hasSave, onNewGame, onLoadGame }: MainMenuProps) {
 				<button className="menu-action" onClick={onLoadGame} disabled={!hasSave}><Save size={17} /> Load Game {!hasSave && <small>NO RECORD</small>}</button>
 				<button className="menu-action" onClick={() => setCreditsOpen(true)}><BookOpen size={17} /> Credits</button>
 			</div>
-			<p className="menu-version">FIELD JOURNAL / 01 · v0.1.0</p>
+			<p className="menu-version">FIELD JOURNAL / 01 · v{packageInfo.version}</p>
 		</section>
 		{creditsOpen && <div className="credits-overlay"><section className="credits-panel"><button className="icon-button credits-close" onClick={() => setCreditsOpen(false)} title="Close credits"><X size={18} /></button><p className="eyebrow">THE BLACK MARCH</p><h2>Credits</h2><p>A small narrative RPG about roads, demons, and the things waiting beyond the walls.</p><span>Created for the March.</span></section></div>}
 	</main>

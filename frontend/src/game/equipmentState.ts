@@ -1,5 +1,5 @@
 // Sépare le catalogue mondial, les objets possédés et les objets équipés.
-import { armors, weapons, type StatName } from '../data/equipment'
+import { armors, weapons, type StatImprovement, type StatName } from '../data/equipment'
 import type { CharacterStats } from '../data/characters/types'
 
 export type EquipmentInventory = {
@@ -34,7 +34,9 @@ export const initialEquipmentState: EquipmentState = {
 export const getEquippedImprovements = (state: EquipmentState) => {
   const equippedWeapon = weapons.find(item => item.id === state.equipped.weaponId)
   const equippedArmor = armors.find(item => item.id === state.equipped.armorId)
-  return [equippedWeapon?.improves, equippedArmor?.improves].filter(Boolean)
+  return [equippedWeapon?.improves, equippedArmor?.improves].filter(
+    (improvement): improvement is StatImprovement => improvement !== undefined,
+  )
 }
 
 // Applique les améliorations compatibles avec les statistiques du personnage.
