@@ -5,7 +5,10 @@ import { percent } from '../../game/stats'
 import {
   dodgeStaminaCost,
   getIncomingAttacks,
-  playerMoves,
+  getAttackTimingDuration,
+  getPlayerAttackDifficulty,
+  getWeaponMultiplier,
+  getPlayerMoves,
   queueMove,
   removeQueuedMove,
   beginPlayerSequence,
@@ -17,12 +20,11 @@ import {
   type TimingGrade,
 } from '../../game/combat'
 
-const timingDuration = 1900
 const targetPosition = 50
 const perfectWindow = 3.5
 const goodWindow = 10
 
-function TimingChallenge({ actionLabel, inputKey, angle, delayMs = 0, disabled = false, onResult }: { actionLabel: string; inputKey: string; angle: AttackType | 'incoming'; delayMs?: number; disabled?: boolean; onResult: (grade: TimingGrade) => void }) {
+function TimingChallenge({ actionLabel, inputKeys, angle, delayMs = 0, durationMs = 1900, difficulty = 1, active = true, reverse = angle === 'incoming', laneIndex, disabled = false, onResult }: { actionLabel: string; inputKeys: string[]; angle: AttackType | 'incoming'; delayMs?: number; durationMs?: number; difficulty?: number; active?: boolean; reverse?: boolean; laneIndex?: number; disabled?: boolean; onResult: (grade: TimingGrade) => void }) {
   const [position, setPosition] = useState(0)
   const positionRef = useRef(0)
   const resultRef = useRef(onResult)
@@ -44,14 +46,15 @@ function TimingChallenge({ actionLabel, inputKey, angle, delayMs = 0, disabled =
   }
 
   useEffect(() => {
+    if (!active) return
     const startedAt = performance.now()
     let frame = 0
     const animate = (now: number) => {
       const elapsed = now - startedAt - delayMs
-      const nextPosition = Math.max(0, Math.min(100, elapsed / timingDuration * 100))
+      const nextPosition = Math.max(0, Math.min(100, elapsed / durationMs * 100))
       positionRef.current = nextPosition
       setPosition(nextPosition)
-      if (elapsed > 0 && nextPosition > targetPosition + goodWindow) {
+      if (elapsed > 0 && nextPosition > targetPosition + goodWindow / difficulty) {
         finishRef.current('miss')
         return
       }
@@ -59,7 +62,13 @@ function TimingChallenge({ actionLabel, inputKey, angle, delayMs = 0, disabled =
     }
     frame = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(frame)
-  }, [delayMs])
+  }, [active, delayMs, durationMs, difficulty])
+
+  useEffect(() => {
+    if (!active || !disabled) return
+    const timeout = window.setTimeout(() => finishRef.current('miss'), delayMs)
+    return () => window.clearTimeout(timeout)
+  }, [active, disabled, delayMs])
 
   useEffect(() => () => {
     if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current)
@@ -67,8 +76,8 @@ function TimingChallenge({ actionLabel, inputKey, angle, delayMs = 0, disabled =
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (disabled) return
-      const matches = inputKey.startsWith('Arrow') ? event.key === inputKey : event.key.toUpperCase() === inputKey.toUpperCase()
+      if (!active || disabled) return
+      const matches = inputKeys.some(inputKey => inputKey === ' ' ? event.code === 'Space' : event.key.toLowerCase() === inputKey.toLowerCase())
       if (matches) {
         event.preventDefault()
         submit()
@@ -76,17 +85,17 @@ function TimingChallenge({ actionLabel, inputKey, angle, delayMs = 0, disabled =
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [inputKey, disabled])
+  }, [inputKeys, active, disabled])
 
   const submit = () => {
     const distance = Math.abs(positionRef.current - targetPosition)
-    finishRef.current(distance <= perfectWindow ? 'perfect' : distance <= goodWindow ? 'good' : 'miss')
+    finishRef.current(distance <= perfectWindow / difficulty ? 'perfect' : distance <= goodWindow / difficulty ? 'good' : 'miss')
   }
 
-  return <div className={`timing-challenge timing-${angle}`}>
-    <div className={`timing-track ${feedback === 'miss' ? 'is-miss' : ''}`} aria-label={`Barre de timing, touche ${inputKey}`}>
+  return <div className={`timing-challenge timing-${angle} ${laneIndex === undefined ? '' : `timing-lane-${laneIndex + 1}`} ${active ? 'is-active' : 'is-waiting'}`}>
+    <div className={`timing-track ${feedback === 'miss' ? 'is-miss' : ''}`} aria-label={`Timing bar, press ${inputKeys.join(' or ')}`}>
       <span className="timing-target" style={{ left: `${targetPosition}%` }} />
-      <button className="timing-cursor" style={{ left: `${angle === 'incoming' ? 100 - position : position}%` }} onClick={submit} disabled={disabled} aria-label={`Appuyer sur ${inputKey}`}><span className="timing-cursor-key">{inputKey === 'ArrowLeft' ? '←' : inputKey === 'ArrowRight' ? '→' : inputKey}</span></button>
+      <button className="timing-cursor" style={{ left: `${reverse ? 100 - position : position}%` }} onClick={submit} disabled={!active || disabled} aria-label={`Press ${inputKeys.join(' or ')}`}><span className="timing-cursor-key">{inputKeys.map(key => key === ' ' ? 'SPACE' : key.toUpperCase()).join('/')}</span></button>
     </div>
     <span className="timing-action-label">{actionLabel}</span>
   </div>
@@ -94,7 +103,7 @@ function TimingChallenge({ actionLabel, inputKey, angle, delayMs = 0, disabled =
 
 function BattleScene({ enemyName, enemyHealth, enemyMaxHealth, phase, lastImpact, impactId, children }: { enemyName: string; enemyHealth: number; enemyMaxHealth: number; phase: CombatState['phase']; lastImpact: CombatState['lastImpact']; impactId: number; children?: ReactNode }) {
   return <div className={`battle-scene ${phase === 'player-timing' ? 'is-player-turn' : ''} ${phase === 'enemy-timing' ? 'is-enemy-turn' : ''} ${lastImpact ? `impact-${lastImpact}` : ''}`}>
-    <svg className="battle-art" viewBox="0 0 960 360" role="img" aria-label={`Loreth affronte ${enemyName} sur une ancienne route forestière`} preserveAspectRatio="xMidYMid slice">
+    <svg className="battle-art" viewBox="0 0 960 360" role="img" aria-label={`Loreth faces ${enemyName} on an old forest road`} preserveAspectRatio="xMidYMid slice">
       <defs>
         <linearGradient id="battle-sky" x2="0" y2="1"><stop stopColor="#18271f" /><stop offset="1" stopColor="#756345" /></linearGradient>
         <linearGradient id="battle-ground" x2="0" y2="1"><stop stopColor="#51563d" /><stop offset="1" stopColor="#191e18" /></linearGradient>
@@ -129,7 +138,7 @@ function BattleScene({ enemyName, enemyHealth, enemyMaxHealth, phase, lastImpact
       {lastImpact === 'enemy' && <g key={`enemy-slash-${impactId}`} className="battle-impact enemy-impact"><path d="M610 105 Q664 151 725 235" fill="none" stroke="#f0d9a9" strokeWidth="9" strokeLinecap="round" /><path d="M610 105 Q664 151 725 235" fill="none" stroke="#fff1cf" strokeWidth="2" strokeLinecap="round" /></g>}
       {lastImpact === 'player' && <g key={`player-slash-${impactId}`} className="battle-impact player-impact"><path d="M154 172 Q228 228 306 313" fill="none" stroke="#d96f5e" strokeWidth="10" strokeLinecap="round" /><path d="M154 172 Q228 228 306 313" fill="none" stroke="#ffd1a1" strokeWidth="2" strokeLinecap="round" /></g>}
     </svg>
-    <div className="battle-enemy-health"><div><span>VITALITÉ</span><b>{enemyHealth} <i>/ {enemyMaxHealth}</i></b></div><div className="battle-meter"><i style={{ width: `${percent(enemyHealth, enemyMaxHealth)}%` }} /></div></div>
+    <div className="battle-enemy-health"><div><span>HEALTH</span><b>{enemyHealth} <i>/ {enemyMaxHealth}</i></b></div><div className="battle-meter"><i style={{ width: `${percent(enemyHealth, enemyMaxHealth)}%` }} /></div></div>
     <div className="scene-caption"><span>LORETH</span><span>{enemyName.toUpperCase()}</span></div>
     <div className="scene-vignette" />
     {children && <div className="timing-overlay">{children}</div>}
@@ -137,10 +146,10 @@ function BattleScene({ enemyName, enemyHealth, enemyMaxHealth, phase, lastImpact
 }
 
 export function Combat({ state, onStateChange, onFlee }: { state: CombatState; onStateChange: (state: CombatState) => void; onFlee: () => void }) {
+  const playerMoves = getPlayerMoves(state.playerWeapon)
   const activeMove = playerMoves.find(move => move.id === state.sequence[state.sequenceIndex])
   const incomingAttacks = getIncomingAttacks(state)
-  const pendingEnemyGrades = useRef<Map<number, TimingGrade>>(new Map())
-  const [resolvedEnemyCues, setResolvedEnemyCues] = useState<number[]>([])
+  const canDefendIncomingAttack = () => state.playerStamina >= dodgeStaminaCost
 
   useEffect(() => {
     if (state.phase !== 'planning') return
@@ -149,12 +158,10 @@ export function Combat({ state, onStateChange, onFlee }: { state: CombatState; o
       if (event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName))) return
 
       const key = event.key.toLowerCase()
-      if (event.code === 'Digit1' || key === '&' || key === '1') {
+      const moveIndex = /^Digit[1-3]$/.test(event.code) ? Number(event.code.slice(-1)) - 1 : Number(key) - 1
+      if (moveIndex >= 0 && moveIndex < playerMoves.length) {
         event.preventDefault()
-        onStateChange(queueMove(state, 'slash'))
-      } else if (event.code === 'Digit2' || key === 'é' || key === '2') {
-        event.preventDefault()
-        onStateChange(queueMove(state, 'pierce'))
+        onStateChange(queueMove(state, playerMoves[moveIndex].id))
       } else if (event.key === 'Enter' && state.sequence.length > 0) {
         event.preventDefault()
         onStateChange(beginPlayerSequence(state))
@@ -166,39 +173,28 @@ export function Combat({ state, onStateChange, onFlee }: { state: CombatState; o
 
     window.addEventListener('keydown', handlePlanningKey)
     return () => window.removeEventListener('keydown', handlePlanningKey)
-  }, [state, onStateChange])
-
-  const showEnemyTiming = (attackIndex: number, grade: TimingGrade) => {
-    if (pendingEnemyGrades.current.has(attackIndex)) return
-    pendingEnemyGrades.current.set(attackIndex, grade)
-    setResolvedEnemyCues(current => [...current, attackIndex])
-    if (pendingEnemyGrades.current.size < incomingAttacks.length) return
-    const grades = incomingAttacks.map((_, index) => pendingEnemyGrades.current.get(index) ?? 'miss')
-    pendingEnemyGrades.current.clear()
-    setResolvedEnemyCues([])
-    onStateChange(resolveEnemyTiming(state, grades))
-  }
+  }, [state, onStateChange, playerMoves])
 
   return <section className="combat battle panel">
-    <header className="battle-header"><div><p className="eyebrow">ENCOUNTER / THE OLD ROAD</p><h2><Swords size={20} /> {state.enemyName}</h2></div><div className="battle-round">ROUND {String(state.round).padStart(2, '0')}</div><button className="battle-retreat" onClick={onFlee}><ArrowLeft size={14} /> Fuir</button></header>
+    <header className="battle-header"><div><p className="eyebrow">ENCOUNTER / THE OLD ROAD · LEVEL {state.enemyLevel}</p><h2><Swords size={20} /> {state.enemyName}</h2></div><div className="battle-round">ROUND {String(state.round).padStart(2, '0')}</div><button className="battle-retreat" onClick={onFlee}><ArrowLeft size={14} /> Retreat</button></header>
     <BattleScene enemyName={state.enemyName} enemyHealth={state.enemyHealth} enemyMaxHealth={state.enemyMaxHealth} phase={state.phase} lastImpact={state.lastImpact} impactId={state.impactId}>
-      {state.phase === 'player-timing' && activeMove && <TimingChallenge key={`player-${state.sequenceIndex}`} actionLabel={activeMove.name} inputKey={activeMove.input} angle={activeMove.type} onResult={grade => onStateChange(resolvePlayerTiming(state, grade))} />}
-      {state.phase === 'enemy-timing' && incomingAttacks.map((attack, index) => resolvedEnemyCues.includes(index) ? null : <TimingChallenge key={`enemy-${state.enemyAttackIndex}-${attack.type}`} actionLabel={attack.direction} inputKey={attack.input} angle={attack.type} delayMs={index * 1100} disabled={state.playerStamina < dodgeStaminaCost * (index + 1)} onResult={grade => showEnemyTiming(index, grade)} />)}
+      {state.phase === 'player-timing' && activeMove && <TimingChallenge key={`player-${state.sequenceIndex}`} actionLabel={activeMove.name} inputKeys={[activeMove.input]} angle={activeMove.type} durationMs={getAttackTimingDuration(state.playerStats.agility, state.enemyStats.agility)} difficulty={getPlayerAttackDifficulty(state, activeMove.id)} onResult={grade => onStateChange(resolvePlayerTiming(state, grade))} />}
+      {state.phase === 'enemy-timing' && incomingAttacks.map((attack, index) => <TimingChallenge key={`enemy-${attack.sequenceIndex}-${attack.id}`} actionLabel={`${attack.name} · ${attack.direction}`} inputKeys={attack.inputs} angle={attack.type} reverse={attack.type !== 'piercing'} laneIndex={attack.sequenceIndex} active={index === 0} durationMs={getAttackTimingDuration(state.playerStats.intelligence, state.enemyStats.intelligence)} difficulty={attack.timingDifficulty} disabled={!canDefendIncomingAttack()} onResult={grade => onStateChange(resolveEnemyTiming(state, grade))} />)}
     </BattleScene>
     <div className="battle-vitals">
-      <div className="battle-vital"><div><span><Heart size={13} /> VITALITÉ</span><b>{state.playerHealth}<i> / {state.playerMaxHealth}</i></b></div><div className="battle-meter health-meter"><i style={{ width: `${percent(state.playerHealth, state.playerMaxHealth)}%` }} /></div></div>
-      <div className="battle-vital"><div><span>✦ ENDURANCE</span><b>{state.playerStamina}<i> / {state.playerMaxStamina}</i></b></div><div className="battle-meter stamina-meter"><i style={{ width: `${percent(state.playerStamina, state.playerMaxStamina)}%` }} /></div></div>
+      <div className="battle-vital"><div><span><Heart size={13} /> HEALTH</span><b>{state.playerHealth}<i> / {state.playerMaxHealth}</i></b></div><div className="battle-meter health-meter"><i style={{ width: `${percent(state.playerHealth, state.playerMaxHealth)}%` }} /></div></div>
+      <div className="battle-vital"><div><span>✦ STAMINA</span><b>{state.playerStamina}<i> / {state.playerMaxStamina}</i></b></div><div className="battle-meter stamina-meter"><i style={{ width: `${percent(state.playerStamina, state.playerMaxStamina)}%` }} /></div></div>
     </div>
     <div className="battle-action-panel">
-      <div className="battle-status"><span className="battle-phase">{state.phase === 'planning' ? 'PRÉPARATION' : state.phase === 'player-timing' ? 'À VOUS DE JOUER' : state.phase === 'enemy-timing' ? 'GARDEZ VOTRE SANG-FROID' : state.phase === 'victory' ? 'VICTOIRE' : 'DÉFAITE'}</span><p>{state.message}</p></div>
+      <div className="battle-status"><span className="battle-phase">{state.phase === 'planning' ? 'PLAN YOUR TURN' : state.phase === 'player-timing' ? 'YOUR ATTACK' : state.phase === 'enemy-timing' ? 'DEFEND YOURSELF' : state.phase === 'victory' ? 'VICTORY' : 'DEFEAT'}</span><p>{state.message}</p></div>
       {state.phase === 'planning' && <div className="planning-panel">
-        <div className="move-list">{playerMoves.map(move => <button key={move.id} className="move-button" disabled={state.playerStamina < move.staminaCost} onClick={() => onStateChange(queueMove(state, move.id))}><span className={`move-mark ${move.type}`}>{move.type === 'slash' ? '╱' : '↗'}</span><span className="move-copy"><b>{move.name}</b><small>{move.type === 'slash' ? 'SLASH' : 'PIQUE'} · {move.damage} DÉGÂTS</small></span><span className="move-hotkey"><kbd>{move.id === 'slash' ? '&' : 'é'}</kbd><small>{move.id === 'slash' ? '1' : '2'}</small></span><span className="move-cost">− {move.staminaCost}</span></button>)}</div>
-        <div className="planned-sequence"><span className="eyebrow">ENCHAÎNEMENT</span>{state.sequence.length ? <div className="sequence-list">{state.sequence.map((moveId, index) => { const move = playerMoves.find(item => item.id === moveId)!; return <button className="sequence-step" key={`${moveId}-${index}`} onClick={() => onStateChange(removeQueuedMove(state, index))} title="Retirer ce coup"><span>{index + 1}</span><b>{move.name}</b><small>×</small></button> })}</div> : <span className="sequence-empty">Choisissez vos coups</span>}</div>
-        <div className="planning-actions"><button className="primary-button" disabled={!state.sequence.length} onClick={() => onStateChange(beginPlayerSequence(state))}><Swords size={15} /> Exécuter <kbd className="planning-hotkey">Enter</kbd><span className="action-count">{state.sequence.length || ''}</span></button><button className="secondary-button" onClick={() => onStateChange(passTurn(state))}>Passer <kbd className="planning-hotkey">Esc</kbd></button></div>
+        <div className="move-list">{playerMoves.map((move, index) => <button key={move.id} className="move-button" disabled={state.playerStamina < move.staminaCost} onClick={() => onStateChange(queueMove(state, move.id))}><span className={`move-mark ${move.type}`}>{move.type === 'slashing' ? '╱' : move.type === 'piercing' ? '↗' : '◆'}</span><span className="move-copy"><b>{move.name}</b><small>{move.type.toUpperCase()} · {Number(((state.playerWeapon.baseDamage + state.playerStats.force * 3) * getWeaponMultiplier(state.playerWeapon, move.type)).toFixed(1))} PRE-ARMOR DMG</small></span><span className="move-hotkey"><kbd>{index + 1}</kbd></span><span className="move-cost">− {move.staminaCost}</span></button>)}</div>
+        <div className="planned-sequence"><span className="eyebrow">SEQUENCE</span>{state.sequence.length ? <div className="sequence-list">{state.sequence.map((moveId, index) => { const move = playerMoves.find(item => item.id === moveId)!; return <button className="sequence-step" key={`${moveId}-${index}`} onClick={() => onStateChange(removeQueuedMove(state, index))} title="Remove this move"><span>{index + 1}</span><b>{move.name}</b><small>×</small></button> })}</div> : <span className="sequence-empty">Choose your moves</span>}</div>
+        <div className="planning-actions"><button className="primary-button" disabled={!state.sequence.length} onClick={() => onStateChange(beginPlayerSequence(state))}><Swords size={15} /> Execute <kbd className="planning-hotkey">Enter</kbd><span className="action-count">{state.sequence.length || ''}</span></button><button className="secondary-button" onClick={() => onStateChange(passTurn(state))}>Pass <kbd className="planning-hotkey">Esc</kbd></button></div>
       </div>}
-      {state.phase === 'enemy-timing' && incomingAttacks.length > 0 && <div className={`enemy-cue ${incomingAttacks.length > 1 ? 'multiple' : ''}`}>{incomingAttacks.map((attack, index) => resolvedEnemyCues.includes(index) ? null : <div className="enemy-cue-copy" key={`${attack.type}-${index}`}><span>ATTAQUE IMMINENTE</span><b>{attack.name}</b><small>{state.playerStamina < dodgeStaminaCost * (index + 1) ? 'Épuisé · coup inévitable' : `${attack.direction} · ${dodgeStaminaCost} END`}</small></div>)}</div>}
-      {state.phase === 'enemy-timing' && state.playerStamina < dodgeStaminaCost && <div className="exhausted-warning"><span>Épuisé. Impossible d’esquiver.</span></div>}
-      {(state.phase === 'victory' || state.phase === 'defeat') && <button className="primary-button battle-finish" onClick={onFlee}>{state.phase === 'victory' ? 'Continuer' : 'Quitter le combat'}</button>}
+      {state.phase === 'enemy-timing' && incomingAttacks.length > 0 && <div className={`enemy-cue ${incomingAttacks.length > 1 ? 'multiple' : ''}`}>{incomingAttacks.map(attack => <div className="enemy-cue-copy" key={`${attack.sequenceIndex}-${attack.id}`}><span>INCOMING ATTACK</span><b>{attack.name}</b><small>{!canDefendIncomingAttack() ? 'Exhausted · hit unavoidable' : `${attack.direction} · Hound uses ${attack.staminaCost} STA · defend ${dodgeStaminaCost} STA`}</small></div>)}</div>}
+      {state.phase === 'enemy-timing' && state.playerStamina < dodgeStaminaCost && <div className="exhausted-warning"><span>Exhausted. You cannot defend.</span></div>}
+      {(state.phase === 'victory' || state.phase === 'defeat') && <button className="primary-button battle-finish" onClick={onFlee}>{state.phase === 'victory' ? 'Continue' : 'Leave combat'}</button>}
     </div>
   </section>
 }

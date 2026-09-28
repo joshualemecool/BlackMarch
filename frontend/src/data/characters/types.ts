@@ -7,7 +7,7 @@ export type CharacterStats = {
   endurance: number
   intelligence: number
   resilience: number
-  speed: number
+  agility: number
 }
 
 // Décrit un personnage de contenu, indépendamment de son affichage.

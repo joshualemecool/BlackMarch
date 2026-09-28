@@ -21,8 +21,8 @@ export type EquipmentState = {
 
 export const initialEquipmentState: EquipmentState = {
   inventory: {
-    weaponIds: ['wall-breaker', 'thorn-spear'],
-    armorIds: ['argnael-mail', 'light-forge-plate'],
+    weaponIds: ['wall-breaker', 'thorn-spear', 'woodcutter-axe', 'thorn-whip'],
+    armorIds: ['argnael-mail', 'light-forge-plate', 'hunter-leather'],
   },
   equipped: {
     weaponId: 'argnael-sabre',
@@ -46,4 +46,26 @@ export const applyEquipmentStats = (stats: CharacterStats, state: EquipmentState
     if (improvement.stat !== 'materials') result[improvement.stat as Exclude<StatName, 'materials'>] += improvement.amount
   }
   return result
+}
+
+export const equipWeapon = (state: EquipmentState, weaponId: string): EquipmentState => {
+  if (!state.inventory.weaponIds.includes(weaponId)) return state
+  return {
+    inventory: {
+      ...state.inventory,
+      weaponIds: [...state.inventory.weaponIds.filter(id => id !== weaponId), ...(state.equipped.weaponId ? [state.equipped.weaponId] : [])],
+    },
+    equipped: { ...state.equipped, weaponId },
+  }
+}
+
+export const equipArmor = (state: EquipmentState, armorId: string): EquipmentState => {
+  if (!state.inventory.armorIds.includes(armorId)) return state
+  return {
+    inventory: {
+      ...state.inventory,
+      armorIds: [...state.inventory.armorIds.filter(id => id !== armorId), ...(state.equipped.armorId ? [state.equipped.armorId] : [])],
+    },
+    equipped: { ...state.equipped, armorId },
+  }
 }

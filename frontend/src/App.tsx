@@ -1,6 +1,6 @@
 // Orchestrateur de la tranche jouable: navigation, dialogue, combat et sauvegarde.
 import { useState } from 'react'
-import { ArrowLeft, Backpack, BookOpen, Compass, Menu, Save, X } from 'lucide-react'
+import { ArrowLeft, Backpack, BookOpen, Compass, Menu, Save, Shield, X } from 'lucide-react'
 import { CharacterPanel } from './components/CharacterPanel/CharacterPanel'
 import { GameMap } from './components/GameMap/GameMap'
 import { LocationCard } from './components/LocationCard/LocationCard'
@@ -14,6 +14,9 @@ import { dialogues } from './data/dialogues'
 import { initialGameState, type GameState } from './game/gameState'
 import { addLog, travelTo } from './game/gameEngine'
 import { createCombatState, type CombatState } from './game/combat'
+import { armors, weapons } from './data/equipment'
+import { applyEquipmentStats, equipArmor, equipWeapon } from './game/equipmentState'
+import { playerCharacter } from './data/characters'
 import { saveGame } from './save/saveGame'
 import { loadGame } from './save/loadGame'
 
@@ -26,6 +29,7 @@ function App() {
   const [characterOpen, setCharacterOpen] = useState(() => window.matchMedia('(min-width: 701px)').matches)
   const [notesOpen, setNotesOpen] = useState(() => window.matchMedia('(min-width: 1251px)').matches)
   const [inventoryOpen, setInventoryOpen] = useState(false)
+  const [inventoryView, setInventoryView] = useState<'inventory' | 'equipment'>('inventory')
   const [saveOpen, setSaveOpen] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const location = argnaelLocations.find(item => item.id === game.location)!
@@ -58,7 +62,9 @@ function App() {
   }
   // Lance la rencontre de démon liée à l'exploration du lieu.
   const beginCombat = () => {
-    setCombat(createCombatState())
+    const weapon = weapons.find(item => item.id === game.equipment.equipped.weaponId) ?? weapons[0]
+    const armor = armors.find(item => item.id === game.equipment.equipped.armorId) ?? armors[0]
+    setCombat(createCombatState(applyEquipmentStats(playerCharacter.stats, game.equipment), weapon, armor))
     setGame(previous => ({ ...previous, mode: 'combat' }))
   }
   const flee = () => { setCombat(null); setGame(previous => ({ ...previous, mode: 'location' })) }
@@ -70,7 +76,7 @@ function App() {
   if (screen === 'menu') return <MainMenu hasSave={hasSave} onNewGame={startNewGame} onLoadGame={resumeGame} />
 
   return <main className="app-shell">
-    <header className="topbar"><div className="brand"><span className="brand-mark">†</span><div><b>THE BLACK MARCH</b><small>FIELD JOURNAL / 01</small></div></div><div className="topbar-actions"><span className="day-count">DAY 04 <i /></span><button className="icon-button" onClick={() => setInventoryOpen(true)} title="Open inventory"><Backpack size={18} /></button><button className="icon-button" onClick={() => setSaveOpen(value => !value)} title="Open save menu"><Save size={18} /></button><button className="icon-button mobile-menu" title="Open menu"><Menu size={18} /></button></div>{saveOpen && <SaveMenu savedAt={savedAt} onSave={recordSave} onClose={() => setSaveOpen(false)} />}</header>
+    <header className="topbar"><div className="brand"><span className="brand-mark">†</span><div><b>THE BLACK MARCH</b><small>FIELD JOURNAL / 01</small></div></div><div className="topbar-actions"><span className="day-count">DAY 04 <i /></span><button className="icon-button" onClick={() => { setInventoryView('inventory'); setInventoryOpen(true) }} title="Open inventory" aria-label="Open inventory"><Backpack size={18} /></button><button className="icon-button" onClick={() => { setInventoryView('equipment'); setInventoryOpen(true) }} title="Open equipment" aria-label="Open equipment"><Shield size={18} /></button><button className="icon-button" onClick={() => setSaveOpen(value => !value)} title="Open save menu"><Save size={18} /></button><button className="icon-button mobile-menu" title="Open menu"><Menu size={18} /></button></div>{saveOpen && <SaveMenu savedAt={savedAt} onSave={recordSave} onClose={() => setSaveOpen(false)} />}</header>
     <div className={`layout ${characterOpen ? 'character-open' : 'character-collapsed'} ${notesOpen ? 'notes-open' : 'notes-collapsed'}`}>
       <CharacterPanel equipment={game.equipment} />
       <section className="main-column">
@@ -85,7 +91,7 @@ function App() {
       </section>
       <aside className="right-rail"><div className="rail-heading"><span>ACTIVE THREADS</span><small>02</small></div>{game.quests.map(quest => <div className="quest" key={quest.id}><span className="quest-dot" /><div><b>{quest.title}</b><p>{quest.detail}</p></div></div>)}<div className="rail-heading log-heading"><span>FIELD NOTES</span><small><X size={12} /></small></div>{game.log.map((entry, index) => <p className="log-entry" key={`${entry}-${index}`}>{entry}</p>)}</aside>
     </div>
-    {inventoryOpen && <Inventory equipment={game.equipment} onClose={() => setInventoryOpen(false)} />}<footer><span>© Unholy Light</span><span>{location.name.toUpperCase()} · {location.type.toUpperCase()}</span></footer>
+    {inventoryOpen && <Inventory view={inventoryView} equipment={game.equipment} onClose={() => setInventoryOpen(false)} onEquipWeapon={weaponId => setGame(previous => ({ ...previous, equipment: equipWeapon(previous.equipment, weaponId) }))} onEquipArmor={armorId => setGame(previous => ({ ...previous, equipment: equipArmor(previous.equipment, armorId) }))} />}<footer><span>© Unholy Light</span><span>{location.name.toUpperCase()} · {location.type.toUpperCase()}</span></footer>
   </main>
 }
 

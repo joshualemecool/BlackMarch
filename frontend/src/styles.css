@@ -224,3 +224,33 @@ button { border: 0; font: inherit; cursor: pointer; }
 .combat { padding: 24px; }.combat-header { justify-content: space-between; }.combat h2 { display: flex; gap: 9px; align-items: center; color: #d7b28b; }.danger-tag { color: #c36e5c; font-size: 9px; border: 1px solid #75483e; padding: 5px 8px; }.enemy-stage { min-height: 330px; display: grid; place-items: center; position: relative; }.enemy-sigil { width: 150px; height: 150px; display: grid; place-items: center; color: #c36e5c; border: 1px solid #75483e; transform: rotate(45deg); }.enemy-sigil svg { transform: rotate(-45deg); }.enemy-health { position: absolute; bottom: 25px; left: 20%; right: 20%; font-size: 9px; color: var(--muted); }.enemy-health b { float: right; color: var(--paper); font-weight: 400; }.meter .enemy { background: #c36e5c; }.combat-actions { gap: 10px; }.combat-hint { color: var(--muted); font-size: 10px; }.overlay { position: fixed; inset: 0; background: rgba(8, 11, 9, .75); display: grid; place-items: center; z-index: 4; }.inventory { width: min(530px, 90vw); padding: 22px; }.modal-heading { justify-content: space-between; }.inventory h2 { display: flex; gap: 9px; align-items: center; }.item-list { margin-top: 25px; }.item { display: flex; align-items: center; gap: 13px; padding: 15px 0; border-top: 1px solid var(--line); }.item-mark { width: 30px; height: 30px; display: grid; place-items: center; background: #2f4230; color: var(--accent); }.item b { font-size: 11px; }.item p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }.item > span { margin-left: auto; color: var(--olive); font-size: 9px; }.save-menu { position: absolute; top: 65px; right: 4vw; z-index: 3; gap: 18px; padding: 12px 14px; background: #202920; border: 1px solid var(--line); box-shadow: 0 10px 30px #080b09; }.save-menu p { margin: 0; font-size: 10px; color: var(--muted); }.save-menu .eyebrow { color: var(--accent); margin-bottom: 4px; }footer { display: flex; justify-content: space-between; padding: 16px 4vw; color: #5d665a; border-top: 1px solid var(--line); font-size: 9px; letter-spacing: .08em; }
 @media (max-width: 1250px) { .layout { grid-template-columns: 185px minmax(0, 1fr); }.right-rail, .section-nav .notes-toggle { display: none; } }
 @media (max-width: 700px) { .topbar { height: 64px; padding: 0 18px; }.brand b { font-size: 10px; }.day-count, .topbar-actions > .icon-button:nth-of-type(2) { display: none; }.mobile-menu { display: inline-flex; }.layout { display: block; padding: 18px; }.character-panel { display: none; }.section-nav { margin-top: 3px; }.map { min-height: 430px; }.map-top { padding: 17px; }.map h1 { font-size: 21px; }.map-canvas { height: 345px; }.location-card { grid-template-columns: 1fr; }.location-art { min-height: 140px; }.location-art b { font-size: 70px; }.location-copy { padding: 25px 22px; }.location-copy h2 { font-size: 24px; }.dialogue-box { align-items: flex-start; }.dialogue-box .icon-button { margin-left: auto; }footer { padding: 14px 18px; font-size: 8px; }footer span:last-child { display: none; }.save-menu { right: 18px; left: 18px; } }
+
+.battle .move-mark.piercing { color: #a8b99b; border-color: #566b55; }
+.battle .move-mark.blunt { color: #c87865; border-color: #75483e; }
+.battle .timing-slashing .timing-track { transform: translate(-50%, -50%) rotate(-45deg); }
+.battle .timing-piercing .timing-track { width: 140px; transform: translate(-50%, -50%) rotate(45deg); }
+.battle .timing-blunt .timing-track { width: 180px; transform: translate(-50%, -50%); }
+.inventory { max-height: min(82vh, 760px); overflow-y: auto; }
+.inventory .item > div:nth-child(2) { min-width: 0; flex: 1; }
+.inventory .item p { line-height: 1.45; overflow-wrap: anywhere; }
+.inventory-subheading { margin-top: 24px; }
+.equip-button { flex: 0 0 auto; padding: 7px 10px; color: var(--paper); background: #29352a; border: 1px solid #455344; font-size: 9px; }
+.equip-button:hover { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 700px) {
+	.topbar-actions > .icon-button:nth-of-type(2) { display: inline-flex; }
+	.topbar-actions > .icon-button:nth-of-type(3) { display: none; }
+	.inventory { width: calc(100vw - 24px); padding: 18px; }
+	.inventory .item { gap: 9px; }
+	.inventory .item > span { font-size: 7px; }
+	.equip-button { padding: 7px; }
+}
+.battle .timing-overlay { display: grid; width: min(420px, calc(100% - 24px)); }
+.battle .timing-challenge.is-waiting { pointer-events: none; }
+.battle .timing-challenge.is-waiting .timing-track { opacity: .38; }
+.battle .timing-challenge.is-waiting .timing-cursor-key { opacity: .55; }
+.battle .enemy-cue.multiple { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 700px) {
+	.battle .enemy-cue.multiple { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+	.battle .enemy-cue-copy > span { font-size: 6px; }
+	.battle .enemy-cue-copy small { font-size: 7px; }
+}
